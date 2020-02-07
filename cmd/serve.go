@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -36,7 +37,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/russross/blackfriday.v2"
+	"github.com/yuin/goldmark"
 )
 
 var (
@@ -81,6 +82,8 @@ func updateRepo() bool {
 }
 
 func helpHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Println("/help requested!")
+
 	// get helpFile path from configuration
 	helpFile := viper.GetString("yum.helpFile")
 
@@ -93,10 +96,14 @@ func helpHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	// render the Markdown file to HTML using the
-	// blackfriday library
-	output := blackfriday.Run(help)
-	log.Println("/help requested!")
-	fmt.Fprintf(w, string(output))
+	// goldmark library
+	var outputBuffer bytes.Buffer
+	if err := goldmark.Convert(help, &outputBuffer); err != nil {
+		log.Printf("Error rendering help file: %v\n", err)
+		http.Error(w, "Could not render the help file", http.StatusInternalServerError)
+	}
+
+	fmt.Fprintf(w, outputBuffer.String())
 }
 
 func checkAuthentication(r *http.Request) bool {
